@@ -1,0 +1,52 @@
+name: Publish Room
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Prepare and verify Room
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import base64, hashlib, json, urllib.request
+          
+          target = Path('site')
+          target.mkdir(exist_ok=True)
+          (target / 'index.html').write_bytes(base64.b64decode('PCFkb2N0eXBlIGh0bWw+CjxodG1sIGxhbmc9InpoLUhLIj4KPGhlYWQ+CjxtZXRhIGNoYXJzZXQ9IlVURi04Ij4KPG1ldGEgbmFtZT0idmlld3BvcnQiIGNvbnRlbnQ9IndpZHRoPWRldmljZS13aWR0aCwgaW5pdGlhbC1zY2FsZT0xLCB2aWV3cG9ydC1maXQ9Y292ZXIiPgo8bWV0YSBuYW1lPSJ0aGVtZS1jb2xvciIgY29udGVudD0iI2Y3ZjdmNyI+CjxtZXRhIG5hbWU9ImRlc2NyaXB0aW9uIiBjb250ZW50PSIiPgo8bWV0YSBwcm9wZXJ0eT0ib2c6dGl0bGUiIGNvbnRlbnQ9IlJvb20iPgo8bWV0YSBwcm9wZXJ0eT0ib2c6ZGVzY3JpcHRpb24iIGNvbnRlbnQ9IiI+CjxtZXRhIG5hbWU9InR3aXR0ZXI6dGl0bGUiIGNvbnRlbnQ9IlJvb20iPgo8bWV0YSBuYW1lPSJ0d2l0dGVyOmRlc2NyaXB0aW9uIiBjb250ZW50PSIiPgo8dGl0bGU+Um9vbTwvdGl0bGU+CjxsaW5rIHJlbD0iaWNvbiIgdHlwZT0iaW1hZ2Uvc3ZnK3htbCIgaHJlZj0iZGF0YTppbWFnZS9zdmcreG1sLCUzQ3N2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA2NCA2NCclM0UlM0NwYXRoIGQ9J00xMyAzMCAxMiAxMCAyNiAyMVEzMiAxOCAzOCAyMUw1MiAxMCA1MSAzMFE1OCA1MiAzMiA1NSA2IDUyIDEzIDMwJyBmaWxsPSclMjMxOTFiMWInLyUzRSUzQ2VsbGlwc2UgY3g9JzIzJyBjeT0nMzUnIHJ4PSc0JyByeT0nMycgZmlsbD0nJTIzYTliYjdjJy8lM0UlM0NlbGxpcHNlIGN4PSc0MicgY3k9JzM1JyByeD0nNCcgcnk9JzMnIGZpbGw9JyUyM2E5YmI3YycvJTNFJTNDL3N2ZyUzRSI+CjxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0ic3R5bGUuY3NzP3Y9cHJvcG9ydGlvbi02Ij4KPHNjcmlwdCBzcmM9ImJlaGF2aW9yLmpzP3Y9cmVhY3Rpb25zLTEwIiBkZWZlcj48L3NjcmlwdD4KPHNjcmlwdCBzcmM9InBvc2VzLmpzIiBkZWZlcj48L3NjcmlwdD4KPHNjcmlwdCBzcmM9Im1vdGlvbi5qcyIgZGVmZXI+PC9zY3JpcHQ+CjxzY3JpcHQgc3JjPSJkaWNlLmpzP3Y9cHJvcG9ydGlvbi02IiBkZWZlcj48L3NjcmlwdD4KPHNjcmlwdCBzcmM9Im1hcmtzLmpzIiBkZWZlcj48L3NjcmlwdD4KPHNjcmlwdCBzcmM9ImFwcC5qcz92PXJlYWN0aW9ucy0xMCIgZGVmZXI+PC9zY3JpcHQ+CjwvaGVhZD4KPGJvZHk+CjxtYWluIGlkPSJyb29tIiBhcmlhLWxhYmVsPSJPbGl2ZSDlmIXkupLli5XmiL/plpMiPgo8Y2FudmFzIGlkPSJ3b3JsZCIgdGFiaW5kZXg9IjAiIGFyaWEtbGFiZWw9IueUqOa7kem8oOaIluaJi+aMh+aOpei/keiyk+WSquOAguaWueWQkemNteenu+WLle+8jOepuueZvemNteinuOaRuO+8jOWKoOa4m+mNtee4ruaUvuOAgiI+PC9jYW52YXM+CjxkaXYgY2xhc3M9ImNhdC1saXN0IiBhcmlhLWxhYmVsPSLlj6vospPlkqrpgY7lmp8iPgo8YnV0dG9uIGNsYXNzPSJjYXQtY2hhcm0iIGRhdGEtY2F0PSJvbGl2ZSIgYXJpYS1sYWJlbD0iT2xpdmXvvIzpgY7lmp8iPjxzdmcgdmlld0JveD0iMCAwIDQyIDQyIj48cGF0aCBkPSJNNyAyMXExNC0xNyAyOCAwLTE0IDE3LTI4IDBaIiBmaWxsPSIjYTZiYjg5IiBzdHJva2U9IiNhMGFkOGUiLz48ZWxsaXBzZSBjeD0iMjEiIGN5PSIyMSIgcng9IjIuMiIgcnk9IjciIGZpbGw9IiMzNDNkMmQiIHN0cm9rZT0ibm9uZSIvPjwvc3ZnPjwvYnV0dG9uPgo8L2Rpdj4KPGRpdiBjbGFzcz0iY29udHJvbHMiIHJvbGU9Imdyb3VwIiBhcmlhLWxhYmVsPSLnlavpnaLpoqjmoLwiPgo8YnV0dG9uIGlkPSJzdHlsZS10b2dnbGUiIGNsYXNzPSJzdHlsZS1jb250cm9sIiBhcmlhLWxhYmVsPSLliIfmj5vliLDloZfptInpoqjmoLwiIGFyaWEtcHJlc3NlZD0iZmFsc2UiIHRpdGxlPSLliIfmj5vliLDloZfptInpoqjmoLwiPjxzdmcgdmlld0JveD0iMCAwIDI0IDI0IiBhcmlhLWhpZGRlbj0idHJ1ZSI+PHJlY3QgeD0iNCIgeT0iNCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjE2IiByeD0iMyIvPjxnIGZpbGw9ImN1cnJlbnRDb2xvciIgc3Ryb2tlPSJub25lIj48Y2lyY2xlIGN4PSI4IiBjeT0iOCIgcj0iMS4yIi8+PGNpcmNsZSBjeD0iMTYiIGN5PSI4IiByPSIxLjIiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSIxLjIiLz48Y2lyY2xlIGN4PSI4IiBjeT0iMTYiIHI9IjEuMiIvPjxjaXJjbGUgY3g9IjE2IiBjeT0iMTYiIHI9IjEuMiIvPjwvZz48L3N2Zz48L2J1dHRvbj4KPC9kaXY+CjxkaXYgaWQ9ImxvYWRpbmciIGNsYXNzPSJsb2FkaW5nIiByb2xlPSJzdGF0dXMiIGFyaWEtbGFiZWw9Iui8ieWFpeiyk+WSqiI+PHNwYW4+wrcgwrcgwrc8L3NwYW4+PC9kaXY+CjxkaXYgY2xhc3M9ImVycm9yLXBhbmVsIiBpZD0ibG9hZC1lcnJvciIgaGlkZGVuPjxidXR0b24gaWQ9InJldHJ5IiBhcmlhLWxhYmVsPSLph43mlrDovInlhaXospPlkqoiPjxzdmcgdmlld0JveD0iMCAwIDI0IDI0Ij48cGF0aCBkPSJNMjAgOFYzbC00IDRhOCA4IDAgMSAwIDMgMTBNMjAgM2gtNSIvPjwvc3ZnPjwvYnV0dG9uPjwvZGl2Pgo8L21haW4+Cjxub3NjcmlwdD7oq4vplovllZ8gSmF2YVNjcmlwdOOAgjwvbm9zY3JpcHQ+CjwvYm9keT4KPC9odG1sPgo='))
+          (target / '.nojekyll').write_text('')
+          files = json.loads('{"app.js": "05fbeb1b63c774b5cc28eee089fc97b2cdda2082d77daaffd2983a3fa194b4de", "assets/olive-doodle-actions-burgundy.png": "b6c0b1ffcad6d48fceddc006982f32855252ed69257f5b86617c4140e9862d56", "assets/olive-doodle-actions-red.png": "6edd297b3d1f5a74d4013ebbdd3e9f6f14f4bfdd82d599ea59c512b1167acb57", "assets/olive-doodle-actions.png": "f6c38f5da22a0c682bf9b69266850ff6223f905e9184a36eb313506a5c7784a6", "assets/olive-doodle-walk.png": "65f372e869b889d2fdbd166d6b05323f23ca9c0e381715a26eb333c84d8c3328", "assets/olive-extra.png": "f8732d2c04d9617a3eee5bcfd70a181f534615eec5e6314a14f111dd3339476b", "assets/olive-illustrated.png": "f770c927936be97bd36d1606713da837ccd83603f4409e010881a63025b45bd6", "assets/olive-walk.png": "b8a825e828922d8c9baac67a2a9bcf8872ae4ca47b1bc1cf1c090983aeb4a0e4", "assets/red-paper.png": "7f14455c43f2ba9757238f7570c9e9ce1facedfc515df9c17bc664cfdfbd9b4f", "behavior.js": "b48c559430da745ea29200f59bbab8e087eb0446a25e961c92419664b8f6ff50", "dice.js": "713e6ac67378d61523dc06971e12f076294c304eb48f8cca232e17af7fe254a1", "marks.js": "d7244dd39eabc077515ea5304d3cfdcf467b6e0dc80aaa3cbbaad1043006ea2c", "motion.js": "a57da36f18453f119efdef717676da0e0d087523648474e1dfab3e3f1eb6bd9c", "poses.js": "5a4ce2f3df4b0291f1d2e85f68ebd2ae71011c2c200cc79bc23ed2d57e0daec3", "style.css": "4efbab9480f7cb762df8af0b02c44764e3f32f0f99364cb6de6d7d81cf9402c4"}')
+          origin = 'https://olive-ash-quiet-room.candidgrove16.chatgpt.site/'
+          for name, expected in files.items():
+              request = urllib.request.Request(origin + name, headers={'User-Agent': 'Room-Pages-Publisher'})
+              with urllib.request.urlopen(request, timeout=60) as response:
+                  data = response.read()
+              actual = hashlib.sha256(data).hexdigest()
+              if actual != expected:
+                  raise RuntimeError('Source changed; refusing to publish: ' + name)
+              output = target / name
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_bytes(data)
+              print('Verified ' + name)
+          print('Room is ready with 17 standalone files.')
+          PY
+      - name: Upload Room
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+          include-hidden-files: true
+      - name: Publish Room
+        id: deployment
+        uses: actions/deploy-pages@v4
